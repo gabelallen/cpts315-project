@@ -2,44 +2,62 @@ import pandas as pd
 from textblob import TextBlob
 from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
+from collections import Counter
 
-def generate_wordclouds(video_comments, video_id):
-    """Generate and save positive/negative word clouds"""
+def extract_words_by_pos(text, pos_tags):
+    """Extract words of specific parts of speech from text."""
+    blob = TextBlob(text)
+    return [word for word, pos in blob.tags if pos in pos_tags]
+
+def generate_wordclouds(video_comments, video_id, pos_tags=None):
+    """Generate and save positive/negative word clouds for specific parts of speech."""
     # Separate positive and negative comments
-    positive_comments = video_comments[video_comments['polarity'] > 0]
-    negative_comments = video_comments[video_comments['polarity'] < 0]
+    positive_comments = video_comments[video_comments['polarity'] > 0.1]
+    negative_comments = video_comments[video_comments['polarity'] < -0.1]
     
-    # Generate positive word cloud
-    if len(positive_comments) > 0:
-        positive_text = " ".join(comment for comment in positive_comments['comment_text'])
-        positive_wc = WordCloud(stopwords=STOPWORDS, width=800, height=400, 
-                               background_color='white').generate(positive_text)
+    def generate_cloud(comments, title, filename, bg_color, colormap):
+        if len(comments) > 0:
+            text = " ".join(comment for comment in comments['comment_text'])
+            
+            # Filter words by parts of speech if pos_tags is provided
+            if pos_tags:
+                words = extract_words_by_pos(text, pos_tags)
+                text = " ".join(words)
+
+            custom_stopwords = {}  # add custom ignores here
+            stopwords = STOPWORDS.union(custom_stopwords)  
         
-        plt.figure(figsize=(10, 5))
-        plt.imshow(positive_wc, interpolation='bilinear')
-        plt.axis("off")
-        plt.title(f"Positive Comments - Video {video_id}")
-        plt.savefig(f"positive_wordcloud_{video_id}.png")
-        plt.close()
-        print(f"Positive word cloud saved as positive_wordcloud_{video_id}.png")
-    else:
-        print("No positive comments found for word cloud")
+            
+            wordcloud = WordCloud(stopwords=STOPWORDS, width=800, height=400, 
+                                  background_color=bg_color, colormap=colormap).generate(text)
+            
+            plt.figure(figsize=(10, 5))
+            plt.imshow(wordcloud, interpolation='bilinear')
+            plt.axis("off")
+            plt.title(title)
+            plt.savefig(filename)
+            plt.close()
+            print(f"{title} saved as {filename}")
+        else:
+            print(f"No comments found for {title.lower()}")
+
+    # Generate positive word cloud
+    generate_cloud(
+        positive_comments, 
+        f"Positive Comments - Video {video_id}", 
+        f"positive_wordcloud_{video_id}.png", 
+        'white', 
+        None
+    )
     
     # Generate negative word cloud
-    if len(negative_comments) > 0:
-        negative_text = " ".join(comment for comment in negative_comments['comment_text'])
-        negative_wc = WordCloud(stopwords=STOPWORDS, width=800, height=400, 
-                               background_color='black', colormap='Reds').generate(negative_text)
-        
-        plt.figure(figsize=(10, 5))
-        plt.imshow(negative_wc, interpolation='bilinear')
-        plt.axis("off")
-        plt.title(f"Negative Comments - Video {video_id}")
-        plt.savefig(f"negative_wordcloud_{video_id}.png")
-        plt.close()
-        print(f"Negative word cloud saved as negative_wordcloud_{video_id}.png")
-    else:
-        print("No negative comments found for word cloud")
+    generate_cloud(
+        negative_comments, 
+        f"Negative Comments - Video {video_id}", 
+        f"negative_wordcloud_{video_id}.png", 
+        'black', 
+        'Reds'
+    )
 
 def get_video_sentiment(video_id):
     """Main function to analyze sentiment and generate word clouds"""
@@ -67,7 +85,7 @@ def get_video_sentiment(video_id):
     
     for comment in video_comments['comment_text']:
         try:
-            sentiment = TextBlob(str(comment)).sentiment  # str() for safety
+            sentiment = TextBlob(str(comment)).sentiment  
             polarity.append(sentiment.polarity)
             subjectivity.append(sentiment.subjectivity)
         except:
@@ -90,7 +108,7 @@ def get_video_sentiment(video_id):
     
     # Generate word clouds
     print("\nGenerating word clouds...")
-    generate_wordclouds(video_comments, video_id)
+    generate_wordclouds(video_comments, video_id, pos_tags=['NN', 'JJ', 'RB'])
     
     return avg_polarity, avg_subjectivity
 
