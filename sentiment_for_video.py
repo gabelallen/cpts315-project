@@ -2,12 +2,13 @@ import pandas as pd
 from textblob import TextBlob
 from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
+import numpy as np
 
 def generate_wordclouds(video_comments, video_id):
     """Generate and save positive/negative word clouds"""
     # Separate positive and negative comments
-    positive_comments = video_comments[video_comments['polarity'] > 0]
-    negative_comments = video_comments[video_comments['polarity'] < 0]
+    positive_comments = video_comments[video_comments['polarity'] > 0.4]
+    negative_comments = video_comments[video_comments['polarity'] < -0.4]
     
     # Generate positive word cloud
     if len(positive_comments) > 0:
@@ -40,6 +41,33 @@ def generate_wordclouds(video_comments, video_id):
         print(f"Negative word cloud saved as negative_wordcloud_{video_id}.png")
     else:
         print("No negative comments found for word cloud")
+
+def calculate_polarization(polarity_scores):
+    """
+    Calculate polarization score (0 to 1) where:
+    0 = completely neutral/uniform opinions
+    1 = completely polarized (all extreme positive or negative)
+    """
+    # Convert to absolute values (distance from neutral)
+    abs_polarity = np.abs(polarity_scores)
+    
+    # Calculate polarization score (mean of absolute polarity)
+    polarization = np.mean(abs_polarity)
+    
+    return polarization
+
+def plot_polarity_distribution(polarity_scores, video_id):
+    """Plot a histogram of polarity scores"""
+    plt.figure(figsize=(10, 5))
+    plt.hist(polarity_scores, bins=20, range=(-1, 1), color='skyblue', edgecolor='black')
+    plt.title(f"Distribution of Polarity Scores - Video {video_id}")
+    plt.xlabel("Polarity Score (-1 to 1)")
+    plt.ylabel("Number of Comments")
+    plt.axvline(x=0, color='red', linestyle='--', label='Neutral')
+    plt.legend()
+    plt.savefig(f"polarity_distribution_{video_id}.png")
+    plt.close()
+    print(f"Polarity distribution plot saved as polarity_distribution_{video_id}.png")
 
 def get_video_sentiment(video_id):
     """Main function to analyze sentiment and generate word clouds"""
@@ -81,18 +109,21 @@ def get_video_sentiment(video_id):
     # Calculate averages
     avg_polarity = video_comments['polarity'].mean()
     avg_subjectivity = video_comments['subjectivity'].mean()
+    polarization_score = calculate_polarization(video_comments['polarity'])
     
     # Print results
     print(f"\nSentiment analysis for video_id: {video_id}")
     print(f"Number of comments analyzed: {len(video_comments)}")
     print(f"Average Polarity: {avg_polarity:.4f} (Range: -1 to 1)")
     print(f"Average Subjectivity: {avg_subjectivity:.4f} (Range: 0 to 1)")
+    print(f"Polarization Score: {polarization_score:.4f} (0 = neutral, 1 = highly polarized)")
     
-    # Generate word clouds
-    print("\nGenerating word clouds...")
+    # Generate visualizations
+    print("\nGenerating visualizations...")
     generate_wordclouds(video_comments, video_id)
+    plot_polarity_distribution(video_comments['polarity'], video_id)
     
-    return avg_polarity, avg_subjectivity
+    return avg_polarity, avg_subjectivity, polarization_score
 
 if __name__ == "__main__":
     # Example usage
